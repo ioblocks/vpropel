@@ -1,4 +1,4 @@
-pragma solidity >=0.4.22 <0.6;
+pragma solidity >=0.4.22 <0.7;
 
 interface IBEP20 {
     /**
