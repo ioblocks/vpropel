@@ -1,4 +1,4 @@
-// Copyright (C) 2015, 2016, 2017 Dapphub
+// Copyright (C) 2015, 2016, 2017 Dapphub, 2020 PayRue ltd.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,11 +13,21 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity >=0.4.22 <0.6;
+pragma solidity >=0.4.22 <0.7;
 
-contract WETH9 {
-    string public name     = "Wrapped Ether";
-    string public symbol   = "WETH";
+import "./IBEP20.sol";
+
+contract VPROPEL {
+    
+    address private immutable _PAYRUEWALLETADDRESS;
+    address private immutable _PROPELTOKENADDRESS;
+    uint256 private immutable _MAXSUPPLY;
+
+    uint256 public immutable VESTING_START_TIMESTAMP;
+    uint256 public immutable VESTING_PERIOD;
+
+    string public name     = "Vested Propel";
+    string public symbol   = "VPROPEL";
     uint8  public decimals = 18;
 
     event  Approval(address indexed src, address indexed guy, uint wad);
@@ -27,23 +37,68 @@ contract WETH9 {
 
     mapping (address => uint)                       public  balanceOf;
     mapping (address => mapping (address => uint))  public  allowance;
+    
+    modifier vestingPeriodPast() {
+        _assertVestingPeriodPast();
+        _;
+    }
+    
+    modifier beforeVestingPeriodBegins() {
+        _assertVestingPeriodNotStarted();
+        _;
+    }
+    
+    modifier onlyPayrueWallet() {
+        require(
+            msg.sender == _PAYRUEWALLETADDRESS,
+            "CALLER_IS_NOT_PAYRUE_ERROR"
+        );
+        _;
+    }
 
-    function() external payable {
-        deposit();
+    constructor(
+        address payrueWalletAddress,
+        address propelTokenAddress)
+        public
+    {
+        _PAYRUEWALLETADDRESS = payrueWalletAddress;
+        _PROPELTOKENADDRESS = propelTokenAddress;
+        _MAXSUPPLY = 3000000000000000000000000000; // max 3BN total supply
+        VESTING_START_TIMESTAMP = 1604397600; // vesting period start at 10am UTC, November 3rd, 2020.
+        VESTING_PERIOD = 52 weeks;
     }
-    function deposit() public payable {
-        balanceOf[msg.sender] += msg.value;
-        emit Deposit(msg.sender, msg.value);
+
+    function deposit(uint wad)
+        public
+        onlyPayrueWallet
+        beforeVestingPeriodBegins
+    {
+        require(
+            wad + totalSupply() <= _MAXSUPPLY,
+            "TOTAL_SUPPLY_ABOVE_3BN_ERROR"
+        );
+        require(
+            IBEP20(_PROPELTOKENADDRESS).transferFrom(msg.sender, address(this), wad),
+            "PROPELBEP20_TRANSFER_FAIL_ERROR"
+        );
+        balanceOf[msg.sender] += wad;
+        emit Deposit(msg.sender, wad);
     }
-    function withdraw(uint wad) public {
+    function withdraw(uint wad)
+        public
+        vestingPeriodPast
+    {
         require(balanceOf[msg.sender] >= wad);
         balanceOf[msg.sender] -= wad;
-        msg.sender.transfer(wad);
+        require(
+            IBEP20(_PROPELTOKENADDRESS).transfer(msg.sender, wad),
+            "PROPELBEP20_WITHDRAW_FAIL_ERROR"
+        );
         emit Withdrawal(msg.sender, wad);
     }
 
     function totalSupply() public view returns (uint) {
-        return address(this).balance;
+        return IBEP20(_PROPELTOKENADDRESS).balanceOf(address(this));
     }
 
     function approve(address guy, uint wad) public returns (bool) {
@@ -73,6 +128,26 @@ contract WETH9 {
         emit Transfer(src, dst, wad);
 
         return true;
+    }
+    
+    function _getVestingEndTimestamp()
+        internal
+        view
+        returns (uint256)
+    {
+        return (VESTING_START_TIMESTAMP + VESTING_PERIOD);
+    }
+    
+    function _assertVestingPeriodPast() internal view {
+        if (block.timestamp < _getVestingEndTimestamp()) {
+            revert("VESTING_PERIOD_NOT_PAST_ERROR");
+        }
+    }
+    
+    function _assertVestingPeriodNotStarted() internal view {
+        if (block.timestamp >= VESTING_START_TIMESTAMP) {
+            revert("VESTING_PERIOD_ALREADY_STARTED_ERROR");
+        }
     }
 }
 
