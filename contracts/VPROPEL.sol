@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GNU GPL-3.0
+
 // Copyright (C) 2015, 2016, 2017 Dapphub, 2020 PayRue ltd.
 
 // This program is free software: you can redistribute it and/or modify
@@ -13,11 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity >=0.4.22 <0.7;
+pragma solidity >=0.4.22 <0.8;
 
 import "./IBEP20.sol";
+import "./ReentrancyGuard.sol";
 
-contract VPROPEL {
+contract VPROPEL is ReentrancyGuard {
     
     address private immutable _PAYRUEWALLETADDRESS;
     address private immutable _PROPELTOKENADDRESS;
@@ -59,7 +62,6 @@ contract VPROPEL {
     constructor(
         address payrueWalletAddress,
         address propelTokenAddress)
-        public
     {
         _PAYRUEWALLETADDRESS = payrueWalletAddress;
         _PROPELTOKENADDRESS = propelTokenAddress;
@@ -72,6 +74,7 @@ contract VPROPEL {
         public
         onlyPayrueWallet
         beforeVestingPeriodBegins
+        nonReentrant
     {
         require(
             wad + totalSupply() <= _MAXSUPPLY,
@@ -87,6 +90,7 @@ contract VPROPEL {
     function withdraw(uint wad)
         public
         vestingPeriodPast
+        nonReentrant
     {
         require(balanceOf[msg.sender] >= wad);
         balanceOf[msg.sender] -= wad;
