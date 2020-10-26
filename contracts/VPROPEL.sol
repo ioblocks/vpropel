@@ -21,7 +21,7 @@ import "./IBEP20.sol";
 import "./ReentrancyGuard.sol";
 
 contract VPROPEL is ReentrancyGuard {
-    
+
     address private immutable _PAYRUEWALLETADDRESS;
     address private immutable _PROPELTOKENADDRESS;
     uint256 private immutable _MAXSUPPLY;
@@ -40,17 +40,17 @@ contract VPROPEL is ReentrancyGuard {
 
     mapping (address => uint)                       public  balanceOf;
     mapping (address => mapping (address => uint))  public  allowance;
-    
+
     modifier vestingPeriodPast() {
         _assertVestingPeriodPast();
         _;
     }
-    
+
     modifier beforeVestingPeriodBegins() {
         _assertVestingPeriodNotStarted();
         _;
     }
-    
+
     modifier onlyPayrueWallet() {
         require(
             msg.sender == _PAYRUEWALLETADDRESS,
@@ -133,7 +133,15 @@ contract VPROPEL is ReentrancyGuard {
 
         return true;
     }
-    
+
+    function getVestingEndTimestamp()
+        external
+        view
+        returns (uint256)
+    {
+        return _getVestingEndTimestamp();
+    }
+
     function _getVestingEndTimestamp()
         internal
         view
@@ -141,13 +149,13 @@ contract VPROPEL is ReentrancyGuard {
     {
         return (VESTING_START_TIMESTAMP + VESTING_PERIOD);
     }
-    
+
     function _assertVestingPeriodPast() internal view {
         if (block.timestamp < _getVestingEndTimestamp()) {
             revert("VESTING_PERIOD_NOT_PAST_ERROR");
         }
     }
-    
+
     function _assertVestingPeriodNotStarted() internal view {
         if (block.timestamp >= VESTING_START_TIMESTAMP) {
             revert("VESTING_PERIOD_ALREADY_STARTED_ERROR");
